@@ -1,0 +1,266 @@
+---
+title: "Global CO₂ Emissions Analysis"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    code_folding: hide
+    theme: united
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 5
+)
+# Install & load packages
+pkgs <- c("ggplot2","dplyr","lubridate","forcats","tidyr","scales","viridis","zoo")
+for(pkg in pkgs) if(!requireNamespace(pkg, quietly=TRUE)) install.packages(pkg)
+lapply(pkgs, library, character.only=TRUE)
+````
+
+# 1. Introduction
+
+This report analyzes global CO₂ emissions data from Our World in Data (OWID). We will:
+
+1. Fetch and clean the dataset
+2. Compute per-capita and total emissions, and GDP per capita
+3. Visualize global trends, country snapshots, and economic relationships
+4. Fit a regression model predicting CO₂ per capita from GDP per capita
+
+# 2. Data Loading & Preparation
+
+```{r load-data}
+url <- "https://raw.githubusercontent.com/owid/co2-data/master/owid-co2-data.csv"
+co2_raw <- read.csv(url, stringsAsFactors=FALSE)
+
+co2 <- co2_raw %>%
+  filter(!is.na(co2_per_capita), !is.na(gdp), population > 0, year >= 1960) %>%
+  transmute(
+    country   = country,
+    iso_code  = iso_code,
+    date      = as.Date(paste0(year, "-01-01")),
+    year      = year,
+    co2_pc    = co2_per_capita,
+    total_co2 = co2,                # Mt
+    gdp_pc    = gdp / population
+  )
+
+latest <- co2 %>%
+  group_by(iso_code, country) %>%
+  slice_max(year, n=1, with_ties=FALSE) %>%
+  ungroup()
+
+global_ts <- co2 %>%
+  group_by(date) %>%
+  summarize(avg_co2_pc = mean(co2_pc, na.rm=TRUE), .groups="drop")
+```
+
+# 3. Global Average CO₂ per Capita Over Time
+
+```{r global-ts}
+library(ggplot2)
+p1 <- ggplot(global_ts, aes(date, avg_co2_pc)) +
+  geom_line(color="forestgreen") +
+  labs(
+    title = "Global Average CO₂ per Capita Over Time",
+    x     = "Date",
+    y     = "t CO₂ per Capita"
+  ) +
+  theme_minimal()
+print(p1)
+```
+
+# 4. GDP vs CO₂ per Capita (Latest Snapshot)
+
+```{r scatter-gdp-co2}
+p2 <- ggplot(latest, aes(gdp_pc, co2_pc)) +
+  geom_point(alpha=0.5) +
+  geom_smooth(method="loess", se=FALSE, color="darkred") +
+  labs(
+    title = "GDP per Capita vs CO₂ per Capita (Latest)",
+    x     = "GDP per Capita (USD)",
+    y     = "t CO₂ per Capita"
+  ) +
+  theme_minimal()
+print(p2)
+```
+
+# 5. Regression Analysis
+
+```{r regression}
+model <- lm(co2_pc ~ gdp_pc, data=latest)
+cat("Linear model summary:\n")
+print(summary(model))
+
+p3 <- ggplot(latest, aes(gdp_pc, co2_pc)) +
+  geom_point(alpha=0.3) +
+  geom_smooth(method="lm", se=TRUE, color="blue") +
+  labs(
+    title    = "Regression: CO₂ per Capita ~ GDP per Capita",
+    subtitle = paste0(
+      "R²=", round(summary(model)$r.squared,3),
+      "; p=", signif(summary(model)$coefficients[2,4],3)
+    ),
+    x = "GDP per Capita (USD)",
+    y = "t CO₂ per Capita"
+  ) +
+  theme_minimal()
+print(p3)
+```
+
+# 6. Top Emitters by CO₂ per Capita
+
+```{r top10-pc}
+top10_pc <- latest %>%
+  arrange(desc(co2_pc)) %>%
+  slice_head(n=10)
+p4 <- ggplot(top10_pc, aes(fct_reorder(country, co2_pc), co2_pc)) +
+  geom_col(fill="darkslateblue") +
+  coord_flip() +
+  labs(
+    title = "Top 10 Countries by CO₂ per Capita (Latest)",
+    x     = NULL,
+    y     = "t CO₂ per Capita"
+  ) +
+  theme_minimal()
+print(p4)
+```
+
+# 7. Trends for Top 5 CO₂ Per-Capita Emitters
+
+```{r ts-top5}
+top5_isos <- top10_pc$iso_code[1:5]
+ts_top5 <- co2 %>% filter(iso_code %in% top5_isos)
+p5 <- ggplot(ts_top5, aes(date, co2_pc, colour=country)) +
+  geom_line() +
+  labs(
+    title = "CO₂ per Capita Over Time: Top 5 Emitters",
+    x     = "Date",
+    y     = "t CO₂ per Capita",
+    colour = "Country"
+  ) +
+  theme_minimal()
+print(p5)
+```
+
+# 8. CO₂ per Capita by GDP Quartile
+
+```{r boxplot-quartiles}
+latest_q <- latest %>%
+  mutate(gdp_q = ntile(gdp_pc, 4))
+p6 <- ggplot(latest_q, aes(factor(gdp_q), co2_pc, fill=factor(gdp_q))) +
+  geom_boxplot() +
+  scale_fill_viridis_d(name="GDP Quartile") +
+  labs(
+    title = "CO₂ per Capita by GDP per Capita Quartile",
+    x     = "GDP Quartile",
+    y     = "t CO₂ per Capita"
+  ) +
+  theme_minimal()
+print(p6)
+```
+
+# 9. Violin Plot by GDP Quartile
+
+```{r violin-quartiles}
+p7 <- ggplot(latest_q, aes(factor(gdp_q), co2_pc, fill=factor(gdp_q))) +
+  geom_violin() +
+  scale_fill_viridis_d(option="turbo", name="GDP Quartile") +
+  labs(
+    title = "Distribution of CO₂ per Capita by GDP Quartile",
+    x     = "GDP Quartile",
+    y     = "t CO₂ per Capita"
+  ) +
+  theme_minimal()
+print(p7)
+```
+
+# 10. Heatmap: CO₂ per Capita by Year & GDP Quartile
+
+```{r heatmap}
+heat_data <- co2 %>%
+  inner_join(latest_q %>% select(iso_code, gdp_q), by="iso_code") %>%
+  group_by(year = lubridate::year(date), gdp_q) %>%
+  summarize(avg_pc = mean(co2_pc, na.rm=TRUE), .groups="drop")
+p8 <- ggplot(heat_data, aes(year, factor(gdp_q), fill=avg_pc)) +
+  geom_tile(color="white") +
+  scale_fill_viridis(name="Avg t CO₂/capita") +
+  labs(
+    title = "Avg CO₂ per Capita by Year & GDP Quartile",
+    x     = "Year",
+    y     = "GDP Quartile"
+  ) +
+  theme_minimal()
+print(p8)
+```
+
+# 11. Cumulative Sum of CO₂ per Capita
+
+```{r cumulative-sum}
+cum_pc <- co2 %>%
+  arrange(date) %>%
+  group_by(date) %>%
+  summarize(sum_pc = sum(co2_pc, na.rm=TRUE), .groups="drop") %>%
+  mutate(cum_pc = cumsum(sum_pc))
+p9 <- ggplot(cum_pc, aes(date, cum_pc)) +
+  geom_line(color="purple") +
+  labs(
+    title = "Cumulative Sum of CO₂ per Capita Over Time",
+    x     = "Date",
+    y     = "Cumulative t CO₂ per Capita"
+  ) +
+  theme_minimal()
+print(p9)
+```
+
+# 12. Year-over-Year % Change in Global Avg CO₂ per Capita
+
+```{r yoy-change}
+pct_change <- global_ts %>%
+  arrange(date) %>%
+  mutate(pct = 100*(avg_co2_pc - lag(avg_co2_pc))/lag(avg_co2_pc))
+p10 <- ggplot(pct_change, aes(date, pct)) +
+  geom_line(color="orange") +
+  labs(
+    title = "Year-over-Year % Change in Global Avg CO₂ per Capita",
+    x     = "Date",
+    y     = "% Change"
+  ) +
+  theme_minimal()
+print(p10)
+```
+
+# 13. CO₂ per Capita vs Total CO₂ Emissions
+
+```{r scatter-total}
+library(scales)
+p11 <- ggplot(latest, aes(total_co2, co2_pc)) +
+  geom_point(alpha=0.5) +
+  geom_smooth(method="lm", se=FALSE, color="darkgreen") +
+  scale_x_log10(labels=comma) +
+  labs(
+    title = "CO₂ per Capita vs Total CO₂ Emissions (Latest)",
+    x     = "Total CO₂ (Mt, log scale)",
+    y     = "t CO₂ per Capita"
+  ) +
+  theme_minimal()
+print(p11)
+```
+
+# 14. Conclusions
+
+This analysis reveals:
+
+* Global per‐capita CO₂ emissions have trended upward since 1960.
+* Wealthier countries tend to emit more CO₂ per person (strong positive relationship).
+* The top 10 per‐capita emitters are small but high‐emission nations.
+* GDP quartile analysis highlights distributional differences.
+* Regression confirms GDP per capita is a significant predictor of emissions per capita.
+
+Further work could segment by region, explore non‐linear models, or incorporate renewable energy metrics.
