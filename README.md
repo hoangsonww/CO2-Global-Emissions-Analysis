@@ -127,7 +127,7 @@ The main script auto-installs any missing packages.
    ```bash
    git clone https://github.com/yourusername/co2-analysis.git
    cd co2-analysis
-````
+   ```
 
 2. **Optional**: copy `.env.example` → `.env` to set `DATA_DIR` if you prefer a custom data folder.
 
