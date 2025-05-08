@@ -62,7 +62,47 @@ This repository contains:
     - (Already #1) — the core global trend  
 
 <p align="center">
-  <img 
+  <img src="img/co2-1.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-2.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-3.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-4.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-5.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-6.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-7.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-8.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-9.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-10.png" width="100%" />
+</p>
+
+<p align="center">
+  <img src="img/co2-11.png" width="100%" />
 </p>
 
 ---
