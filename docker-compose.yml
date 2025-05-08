@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  co2:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - DATA_DIR=/app/data
+    command: ["bash", "scripts/build_report.sh"]
